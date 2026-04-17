@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+
+/* ── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg-page:    #0a0a0a;
+  --bg-button:  #111111;
+  --bg-card:    #0e0e0e;
+  --bg-surface: rgba(18, 18, 18, 0.8);
+
+  /* Text */
+  --text-primary:   #ededed;
+  --text-secondary: #a1a1a1;
+  --text-muted:     #666666;
+
+  /* Brand Green */
+  --green:        #3ecf8e;
+  --green-link:   #00c573;
+  --green-border: rgba(62, 207, 142, 0.2);
+
+  /* Borders */
+  --border-subtle:   #1a1a1a;
+  --border-standard: #222222;
+  --border-prominent: #2a2a2a;
+  --border-light:    #333333;
+
+  /* Radius */
+  --radius-pill: 9999px;
+  --radius-card: 16px;
+  --radius-sm:   8px;
+
+  /* Font families */
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', 'Roboto Mono', monospace;
+
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 400; }
+p { margin: 0; }
+button { font-family: var(--font-sans); cursor: pointer; }
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
