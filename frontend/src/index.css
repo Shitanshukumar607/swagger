@@ -3,39 +3,45 @@
 /* ── Design Tokens ──────────────────────────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg-page:    #0a0a0a;
-  --bg-button:  #111111;
-  --bg-card:    #0e0e0e;
-  --bg-surface: rgba(18, 18, 18, 0.8);
+  --bg-page:    #171717; /* Primary Canvas */
+  --bg-button:  #0f0f0f; /* Primary Button / Deep Surface */
+  --bg-card:    #171717; /* Card background matches page usually */
+  --bg-surface: rgba(41, 41, 41, 0.84); /* Glass Dark */
 
   /* Text */
-  --text-primary:   #ededed;
-  --text-secondary: #a1a1a1;
-  --text-muted:     #666666;
+  --text-primary:   #fafafa; /* Off White */
+  --text-secondary: #b4b4b4; /* Light Gray */
+  --text-muted:     #898989; /* Mid Gray */
 
   /* Brand Green */
-  --green:        #3ecf8e;
-  --green-link:   #00c573;
-  --green-border: rgba(62, 207, 142, 0.2);
+  --green:        #3ecf8e; /* Supabase Green */
+  --green-link:   #00c573; /* Interactive Green */
+  --green-border: rgba(62, 207, 142, 0.3); /* Subtle Green Accent Border */
 
   /* Borders */
-  --border-subtle:   #1a1a1a;
-  --border-standard: #222222;
-  --border-prominent: #2a2a2a;
-  --border-light:    #333333;
+  --border-subtle:    #242424; /* Dark Border / Subtle */
+  --border-standard:  #2e2e2e; /* Border Dark / Standard */
+  --border-prominent: #363636; /* Mid Border / Prominent */
+  --border-light:     #393939; /* Border Light */
 
   /* Radius */
   --radius-pill: 9999px;
   --radius-card: 16px;
-  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-sm:   6px;
 
   /* Font families */
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Geist Mono', 'SF Mono', 'Roboto Mono', monospace;
 
+  /* Animations */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.5;
   color: var(--text-primary);
   background-color: var(--bg-page);
   -webkit-font-smoothing: antialiased;
@@ -44,13 +50,24 @@
 
 /* ── Reset ──────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; }
-h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 400; }
+body { margin: 0; background: var(--bg-page); overflow-x: hidden; }
+h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 400; color: var(--text-primary); }
 p { margin: 0; }
-button { font-family: var(--font-sans); cursor: pointer; }
+button { font-family: var(--font-sans); cursor: pointer; border: none; outline: none; }
+input { font-family: var(--font-sans); }
 
 #root {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Global Animations ─────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeInUp var(--transition-slow) forwards;
 }
