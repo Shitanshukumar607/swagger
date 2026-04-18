@@ -73,24 +73,6 @@ function FileIcon() {
   );
 }
 
-function TerminalIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
-    </svg>
-  );
-}
-
 // ── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -103,6 +85,7 @@ export default function App() {
   const [tests, setTests] = useState<TestCase[]>([]);
   const [results, setResults] = useState<RunResult[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── File pick / drag ────────────────────────────────────────────────────
@@ -114,6 +97,7 @@ export default function App() {
     setTests([]);
     setResults([]);
     setSummary(null);
+    setSelectedTestId(null);
   }
 
   function onFileChange(e: ChangeEvent<HTMLInputElement>) {
@@ -133,6 +117,7 @@ export default function App() {
     if (!file) return;
     setLoading(true);
     setError("");
+    setSelectedTestId(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -186,23 +171,17 @@ export default function App() {
     return acc;
   }, {});
 
+  const selectedTest = tests.find((t) => t.id === selectedTestId);
+  const selectedResult = selectedTestId ? resultById[selectedTestId] : null;
+
   return (
     <div className="app">
-      <header className="navbar">
-        <div className="navbar-brand">
-          <TerminalIcon />
-          <span className="navbar-title">Swagger Test Generator</span>
-          <span className="navbar-badge">v1.0</span>
-        </div>
-      </header>
-
       <main className="main animate-fade-in">
         <section className="hero">
-          <span className="hero-label">Automated QA</span>
           <h1 className="hero-heading">Validate your API in seconds.</h1>
           <p className="hero-subtext">
-            Upload your Swagger specification to automatically generate and execute 
-            negative test cases against your API.
+            Upload your Swagger specification to automatically generate and
+            execute negative test cases against your API.
           </p>
         </section>
 
@@ -231,7 +210,9 @@ export default function App() {
             />
             <UploadIcon />
             <p className="upload-primary-text">
-              {file ? "Replace Swagger File" : "Drop your spec here or click to browse"}
+              {file
+                ? "Replace Swagger File"
+                : "Drop your spec here or click to browse"}
             </p>
             <p className="upload-hint">Supports OpenAPI .json files</p>
 
@@ -289,7 +270,9 @@ export default function App() {
         {phase !== "upload" && (
           <div className="card tests-card animate-fade-in" id="tests-card">
             <div className="tests-header">
-              <span className="tests-count">{tests.length} test cases generated</span>
+              <span className="tests-count">
+                {tests.length} test cases generated
+              </span>
             </div>
 
             {error && (
@@ -306,15 +289,21 @@ export default function App() {
                   <span className="summary-label">Total</span>
                 </div>
                 <div className="summary-stat">
-                  <span className="summary-value passed-val">{summary.passed}</span>
+                  <span className="summary-value passed-val">
+                    {summary.passed}
+                  </span>
                   <span className="summary-label">Passed</span>
                 </div>
                 <div className="summary-stat">
-                  <span className="summary-value failed-val">{summary.failed}</span>
+                  <span className="summary-value failed-val">
+                    {summary.failed}
+                  </span>
                   <span className="summary-label">Failed</span>
                 </div>
                 <div className="summary-stat">
-                  <span className="summary-value error-val">{summary.errored}</span>
+                  <span className="summary-value error-val">
+                    {summary.errored}
+                  </span>
                   <span className="summary-label">Errors</span>
                 </div>
               </div>
@@ -325,11 +314,15 @@ export default function App() {
               {tests.map((t) => {
                 const result = resultById[t.id];
                 const statusClass = result?.status ?? "";
+                const isSelected = selectedTestId === t.id;
                 return (
                   <div
                     key={t.id}
-                    className={`test-item ${statusClass}`}
+                    className={`test-item ${statusClass}${isSelected ? " selected" : ""}`}
                     id={`test-${t.id}`}
+                    onClick={() => setSelectedTestId(t.id)}
+                    role="button"
+                    tabIndex={0}
                   >
                     <div className={`test-status-dot ${statusClass}`} />
                     <div className="test-info">
@@ -367,12 +360,124 @@ export default function App() {
                 disabled={loading}
               >
                 {loading ? <span className="spinner" /> : null}
-                {loading ? "Running…" : phase === "results" ? "Run Again" : "Execute Tests"}
+                {loading
+                  ? "Running…"
+                  : phase === "results"
+                    ? "Run Again"
+                    : "Execute Tests"}
               </button>
             </div>
           </div>
         )}
       </main>
+
+      {/* Detail Modal Overlay */}
+      {selectedTest && (
+        <div
+          className="modal-overlay animate-fade-in"
+          onClick={() => setSelectedTestId(null)}
+        >
+          <div
+            className="modal-content animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h2 className="modal-title">{selectedTest.name}</h2>
+                <p className="modal-subtitle">{selectedTest.description}</p>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setSelectedTestId(null)}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Result Section if available */}
+              {selectedResult && (
+                <div className={`modal-result-banner ${selectedResult.status}`}>
+                  <div className="result-main">
+                    <span className="result-label">Status:</span>
+                    <span className={`result-value ${selectedResult.status}`}>
+                      {selectedResult.status.toUpperCase()}
+                    </span>
+                  </div>
+                  {selectedResult.message && (
+                    <p className="result-message">{selectedResult.message}</p>
+                  )}
+                  <div className="result-stats">
+                    <div className="stat-item">
+                      <span className="stat-label">Expected:</span>
+                      <span className="stat-value">
+                        {selectedResult.expected_status}
+                      </span>
+                    </div>
+                    {selectedResult.actual_status && (
+                      <div className="stat-item">
+                        <span className="stat-label">Actual:</span>
+                        <span className="stat-value">
+                          {selectedResult.actual_status}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-grid">
+                <div className="modal-section">
+                  <h3 className="section-label">Endpoint</h3>
+                  <div className="endpoint-box">
+                    <span className={`method-badge ${selectedTest.method}`}>
+                      {selectedTest.method}
+                    </span>
+                    <code className="path-text">{selectedTest.path}</code>
+                  </div>
+                </div>
+
+                <div className="modal-section">
+                  <h3 className="section-label">Category</h3>
+                  <span className="category-badge">
+                    {selectedTest.category}
+                  </span>
+                </div>
+              </div>
+
+              {selectedTest.params &&
+                Object.keys(selectedTest.params).length > 0 && (
+                  <div className="modal-section">
+                    <h3 className="section-label">Query Parameters</h3>
+                    <pre className="json-box">
+                      {JSON.stringify(selectedTest.params, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+              {selectedTest.payload &&
+                Object.keys(selectedTest.payload).length > 0 && (
+                  <div className="modal-section">
+                    <h3 className="section-label">Request Body</h3>
+                    <pre className="json-box">
+                      {JSON.stringify(selectedTest.payload, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+              {selectedTest.headers &&
+                Object.keys(selectedTest.headers).length > 0 && (
+                  <div className="modal-section">
+                    <h3 className="section-label">Headers</h3>
+                    <pre className="json-box">
+                      {JSON.stringify(selectedTest.headers, null, 2)}
+                    </pre>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
