@@ -21,6 +21,8 @@ class RunResult(BaseModel):
     expected_status: int
     actual_status: Optional[int] = None
     message: str
+    response: Optional[Dict[str, Any]] = None
+    response_body: Optional[Any] = None
     extracted_token: Optional[str] = None
 
 class RunRequest(BaseModel):

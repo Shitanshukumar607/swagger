@@ -21,6 +21,8 @@ interface RunResult {
   expected_status: number;
   actual_status?: number;
   message: string;
+  response?: Record<string, unknown>;
+  response_body?: unknown;
 }
 
 interface Summary {
@@ -173,6 +175,33 @@ export default function App() {
 
   const selectedTest = tests.find((t) => t.id === selectedTestId);
   const selectedResult = selectedTestId ? resultById[selectedTestId] : null;
+  const selectedResponseJson =
+    selectedResult?.response ??
+    (selectedResult?.response_body !== undefined &&
+    selectedResult.response_body !== null
+      ? {
+          status_code: selectedResult.actual_status ?? null,
+          body: selectedResult.response_body,
+        }
+      : null);
+
+  function formatBodyForDisplay(body: unknown): string {
+    if (typeof body === "string") {
+      const trimmed = body.trim();
+      if (!trimmed) return body;
+      try {
+        return JSON.stringify(JSON.parse(body), null, 2);
+      } catch {
+        return body;
+      }
+    }
+
+    try {
+      return JSON.stringify(body, null, 2);
+    } catch {
+      return String(body);
+    }
+  }
 
   return (
     <div className="app">
@@ -464,6 +493,15 @@ export default function App() {
                     </pre>
                   </div>
                 )}
+
+              {selectedResponseJson && (
+                <div className="modal-section">
+                  <h3 className="section-label">Full Response (JSON)</h3>
+                  <pre className="json-box">
+                    {formatBodyForDisplay(selectedResponseJson)}
+                  </pre>
+                </div>
+              )}
 
               {selectedTest.headers &&
                 Object.keys(selectedTest.headers).length > 0 && (
