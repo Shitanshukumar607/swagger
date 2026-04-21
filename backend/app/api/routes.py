@@ -2,7 +2,7 @@ import asyncio
 import httpx
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.models import RunRequest, RunResponse, TestCase
-from app.services.generator import parse_swagger, generate_tests_for_operation
+from app.services.test_generator import parse_swagger, generate_tests_for_operation
 from app.services.runner import run_single_test
 
 router = APIRouter()
@@ -33,9 +33,16 @@ async def generate_tests(file: UploadFile = File(...)):
 
 @router.post("/run-tests")
 async def run_tests(req: RunRequest):
+    results = []
+    current_token = None
     async with httpx.AsyncClient(timeout=10.0) as client:
-        tasks = [run_single_test(client, test, req.base_url) for test in req.tests]
-        results = await asyncio.gather(*tasks)
+        for test in req.tests:
+            # Reorder login test first implicitly if we had control over sorting, 
+            # but user states "run the tests in order", so we rely on the order in req.tests.
+            result = await run_single_test(client, test, req.base_url, current_token)
+            if result.extracted_token:
+                current_token = result.extracted_token
+            results.append(result)
 
     passed = sum(1 for r in results if r.status == "passed")
     failed = sum(1 for r in results if r.status == "failed")

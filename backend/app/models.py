@@ -12,6 +12,7 @@ class TestCase(BaseModel):
     headers: Optional[Dict[str, str]] = None
     params: Optional[Dict[str, str]] = None
     category: str  # e.g. "missing_required", "invalid_type", "auth", etc.
+    requires_auth: bool = False
 
 class RunResult(BaseModel):
     id: str
@@ -20,6 +21,7 @@ class RunResult(BaseModel):
     expected_status: int
     actual_status: Optional[int] = None
     message: str
+    extracted_token: Optional[str] = None
 
 class RunRequest(BaseModel):
     tests: List[TestCase]
