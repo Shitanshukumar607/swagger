@@ -1,26 +1,31 @@
 import re
-import random
-import string
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.models import TestCase
-from .models_ir import Endpoint, Param
+from .models_ir import Endpoint
 from .schema_utils import get_schema, sample_value, wrong_type_value, generate_valid_payload
 
 def get_next_id(counter: List[int]) -> str:
     counter[0] += 1
     return f"tc_{counter[0]:03d}"
 
+def resolve_path_params(spec: Dict[str, Any], endpoint: Endpoint, overrides: Optional[Dict[str, Any]] = None) -> str:
+    """Return a concrete path by filling all path params with sample or overridden values."""
+    path = endpoint.path
+    overrides = overrides or {}
+
+    for param in endpoint.path_params:
+        schema = get_schema(spec, param.schema)
+        value = overrides[param.name] if param.name in overrides else sample_value(schema)
+        path = re.sub(rf"\{{{re.escape(param.name)}\}}", str(value), path)
+
+    return path
+
 def positive_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     payload = None
     if endpoint.body_schema:
         payload = generate_valid_payload(spec, endpoint.body_schema)
-        
-    # generate valid path by replacing path parameters
-    path = endpoint.path
-    for param in endpoint.path_params:
-        schema = get_schema(spec, param.schema)
-        val = sample_value(schema)
-        path = re.sub(rf"\{{{param.name}\}}", str(val), path)
+
+    path = resolve_path_params(spec, endpoint)
         
     return [TestCase(
         id=get_next_id(counter),
@@ -36,8 +41,9 @@ def positive_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
 def missing_required_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.body_schema:
         return []
-        
+
     tests = []
+    path = resolve_path_params(spec, endpoint)
     schema = get_schema(spec, endpoint.body_schema)
     required = schema.get("required", [])
     props = schema.get("properties", {})
@@ -49,7 +55,7 @@ def missing_required_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter:
             name=f"Missing required field '{field}' on {endpoint.method.upper()} {endpoint.path}",
             description=f"Send request without required field '{field}'. Expect 4xx.",
             method=endpoint.method.upper(),
-            path=endpoint.path,
+            path=path,
             expected_status=422,
             payload=payload,
             category="missing_required",
@@ -59,8 +65,9 @@ def missing_required_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter:
 def wrong_type_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.body_schema:
         return []
-        
+
     tests = []
+    path = resolve_path_params(spec, endpoint)
     schema = get_schema(spec, endpoint.body_schema)
     props = schema.get("properties", {})
     
@@ -78,7 +85,7 @@ def wrong_type_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[
             name=f"Wrong type for '{field}' on {endpoint.method.upper()} {endpoint.path}",
             description=f"Send '{field}' as wrong type. Expect 4xx.",
             method=endpoint.method.upper(),
-            path=endpoint.path,
+            path=path,
             expected_status=422,
             payload=payload,
             category="invalid_type",
@@ -87,6 +94,7 @@ def wrong_type_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[
 
 def query_param_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     tests = []
+    path = resolve_path_params(spec, endpoint)
     required_params = [p for p in endpoint.query_params if p.required]
     for param in required_params:
         tests.append(TestCase(
@@ -94,7 +102,7 @@ def query_param_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List
             name=f"Missing required query param '{param.name}' on {endpoint.method.upper()} {endpoint.path}",
             description=f"Omit required query parameter '{param.name}'. Expect 4xx.",
             method=endpoint.method.upper(),
-            path=endpoint.path,
+            path=path,
             expected_status=422,
             params={},
             category="missing_required_param",
@@ -106,7 +114,7 @@ def path_param_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[
     for param in endpoint.path_params:
         schema = get_schema(spec, param.schema)
         if schema.get("type") in ("integer", "number"):
-            invalid_path = re.sub(rf"\{{{param.name}\}}", "INVALID_ID", endpoint.path)
+            invalid_path = resolve_path_params(spec, endpoint, {param.name: "INVALID_ID"})
             tests.append(TestCase(
                 id=get_next_id(counter),
                 name=f"Invalid path param '{param.name}' type on {endpoint.method.upper()} {endpoint.path}",
@@ -121,12 +129,13 @@ def path_param_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[
 def auth_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.requires_auth:
         return []
+    path = resolve_path_params(spec, endpoint)
     return [TestCase(
         id=get_next_id(counter),
         name=f"Unauthenticated request to {endpoint.method.upper()} {endpoint.path}",
         description="Send request without auth token. Expect 401.",
         method=endpoint.method.upper(),
-        path=endpoint.path,
+        path=path,
         expected_status=401,
         headers={},
         category="auth",
@@ -135,8 +144,9 @@ def auth_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) 
 def boundary_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.body_schema:
         return []
-        
+
     tests = []
+    path = resolve_path_params(spec, endpoint)
     schema = get_schema(spec, endpoint.body_schema)
     props = schema.get("properties", {})
     
@@ -157,7 +167,7 @@ def boundary_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
                     name=f"Below minimum boundary for '{field}' on {endpoint.method.upper()} {endpoint.path}",
                     description=f"Send '{field}' below min limit. Expect 4xx.",
                     method=endpoint.method.upper(),
-                    path=endpoint.path,
+                    path=path,
                     expected_status=422,
                     payload=payload,
                     category="boundary",
@@ -170,7 +180,7 @@ def boundary_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
                     name=f"Above maximum boundary for '{field}' on {endpoint.method.upper()} {endpoint.path}",
                     description=f"Send '{field}' above max limit. Expect 4xx.",
                     method=endpoint.method.upper(),
-                    path=endpoint.path,
+                    path=path,
                     expected_status=422,
                     payload=payload,
                     category="boundary",
@@ -189,7 +199,7 @@ def boundary_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
                     name=f"Below minLength for '{field}' on {endpoint.method.upper()} {endpoint.path}",
                     description=f"Send '{field}' shorter than minLength. Expect 4xx.",
                     method=endpoint.method.upper(),
-                    path=endpoint.path,
+                    path=path,
                     expected_status=422,
                     payload=payload,
                     category="boundary",
@@ -202,7 +212,7 @@ def boundary_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
                     name=f"Above maxLength for '{field}' on {endpoint.method.upper()} {endpoint.path}",
                     description=f"Send '{field}' longer than maxLength. Expect 4xx.",
                     method=endpoint.method.upper(),
-                    path=endpoint.path,
+                    path=path,
                     expected_status=422,
                     payload=payload,
                     category="boundary",
@@ -213,8 +223,9 @@ def boundary_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
 def enum_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.body_schema:
         return []
-        
+
     tests = []
+    path = resolve_path_params(spec, endpoint)
     schema = get_schema(spec, endpoint.body_schema)
     props = schema.get("properties", {})
     
@@ -228,7 +239,7 @@ def enum_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) 
                 name=f"Invalid enum value for '{field}' on {endpoint.method.upper()} {endpoint.path}",
                 description=f"Send invalid enum value for '{field}'. Expect 4xx.",
                 method=endpoint.method.upper(),
-                path=endpoint.path,
+                path=path,
                 expected_status=422,
                 payload=payload,
                 category="enum",
@@ -239,8 +250,9 @@ def enum_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) 
 def format_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.body_schema:
         return []
-        
+
     tests = []
+    path = resolve_path_params(spec, endpoint)
     schema = get_schema(spec, endpoint.body_schema)
     props = schema.get("properties", {})
     
@@ -263,7 +275,7 @@ def format_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]
                 name=f"Invalid format '{fmt}' for '{field}' on {endpoint.method.upper()} {endpoint.path}",
                 description=f"Send invalid {fmt} string for '{field}'. Expect 4xx.",
                 method=endpoint.method.upper(),
-                path=endpoint.path,
+                path=path,
                 expected_status=422,
                 payload=payload,
                 category="format",
@@ -274,8 +286,9 @@ def format_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]
 def fuzz_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     if not endpoint.body_schema:
         return []
-        
+
     tests = []
+    path = resolve_path_params(spec, endpoint)
     schema = get_schema(spec, endpoint.body_schema)
     props = schema.get("properties", {})
     
@@ -293,7 +306,7 @@ def fuzz_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) 
             name=f"Fuzz: Large payload for '{field}' on {endpoint.method.upper()} {endpoint.path}",
             description=f"Send 10k chars for '{field}'. Expect handled cleanly.",
             method=endpoint.method.upper(),
-            path=endpoint.path,
+            path=path,
             expected_status=422, # Or 413, we assume 422 standard validation fail
             payload=payload,
             category="fuzz",
@@ -307,7 +320,7 @@ def fuzz_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) 
             name=f"Fuzz: Special characters for '{field}' on {endpoint.method.upper()} {endpoint.path}",
             description=f"Send injection payloads for '{field}'. Expect handled cleanly.",
             method=endpoint.method.upper(),
-            path=endpoint.path,
+            path=path,
             expected_status=422,
             payload=payload,
             category="fuzz",
