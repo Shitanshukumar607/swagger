@@ -1,6 +1,27 @@
 import httpx
 from app.models import TestCase, RunResult
 
+
+def _extract_token_value(data):
+    if isinstance(data, dict):
+        for key in ("token", "access_token", "accessToken", "id_token", "idToken", "jwt"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+
+        for value in data.values():
+            token = _extract_token_value(value)
+            if token:
+                return token
+
+    if isinstance(data, list):
+        for item in data:
+            token = _extract_token_value(item)
+            if token:
+                return token
+
+    return None
+
 async def run_single_test(client: httpx.AsyncClient, test: TestCase, base_url: str, auth_token: str = None) -> RunResult:
     url = base_url.rstrip("/") + test.path
     headers = test.headers or {}
@@ -46,11 +67,10 @@ async def run_single_test(client: httpx.AsyncClient, test: TestCase, base_url: s
         passed = actual in expected_set
 
         extracted_token = None
-        if passed and actual in (200, 201):
+        if passed and 200 <= actual < 300:
             try:
                 data = resp.json()
-                if isinstance(data, dict):
-                    extracted_token = data.get("token") or data.get("access_token")
+                extracted_token = _extract_token_value(data)
             except:
                 pass
 

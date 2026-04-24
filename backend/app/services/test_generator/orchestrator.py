@@ -3,6 +3,7 @@ from app.models import TestCase
 from .models_ir import Endpoint, Param
 from .strategies import STRATEGIES
 from .schema_utils import get_schema
+from .auth_setup import is_auth_setup_operation
 
 def build_endpoint(spec: Dict[str, Any], method: str, path: str, operation: Dict[str, Any]) -> Endpoint:
     # Build params
@@ -52,7 +53,8 @@ def generate_tests_for_operation(
     method: str,
     path: str,
     operation: Dict[str, Any],
-    counter: List[int]
+    counter: List[int],
+    skip_positive_for_auth_setup: bool = False,
 ) -> List[TestCase]:
     endpoint = build_endpoint(spec, method, path, operation)
     tests = []
@@ -63,5 +65,8 @@ def generate_tests_for_operation(
             if t.category != "auth":
                 t.requires_auth = endpoint.requires_auth
         tests.extend(strategy_tests)
+
+    if skip_positive_for_auth_setup and is_auth_setup_operation(path, method, operation):
+        tests = [t for t in tests if t.category != "positive"]
         
     return tests

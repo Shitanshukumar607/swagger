@@ -20,12 +20,33 @@ def resolve_path_params(spec: Dict[str, Any], endpoint: Endpoint, overrides: Opt
 
     return path
 
+def infer_success_status(operation: Dict[str, Any], fallback: int) -> int:
+    responses = operation.get("responses", {})
+    success_codes = []
+
+    for raw_status in responses.keys():
+        status_code = None
+        if isinstance(raw_status, int):
+            status_code = raw_status
+        elif isinstance(raw_status, str) and raw_status.isdigit():
+            status_code = int(raw_status)
+
+        if status_code is not None and 200 <= status_code < 300:
+            success_codes.append(status_code)
+
+    if success_codes:
+        return min(success_codes)
+
+    return fallback
+
 def positive_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[int]) -> List[TestCase]:
     payload = None
     if endpoint.body_schema:
         payload = generate_valid_payload(spec, endpoint.body_schema)
 
     path = resolve_path_params(spec, endpoint)
+    fallback_status = 200 if endpoint.method.lower() == "get" else 201
+    expected_status = infer_success_status(endpoint.operation, fallback_status)
         
     return [TestCase(
         id=get_next_id(counter),
@@ -33,7 +54,7 @@ def positive_strategy(spec: Dict[str, Any], endpoint: Endpoint, counter: List[in
         description="Send valid request with all expected fields.",
         method=endpoint.method.upper(),
         path=path,
-        expected_status=200 if endpoint.method.lower() == "get" else 201, # approximate baseline
+        expected_status=expected_status,
         payload=payload,
         category="positive"
     )]
